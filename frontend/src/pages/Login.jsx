@@ -92,19 +92,20 @@ export default function Login() {
           </form>
 
           {/* Test accounts hint */}
+          {import.meta.env.DEV && (
           <div className="mt-6 pt-5 border-t border-slate-700">
-            <p className="text-xs text-slate-500 font-medium mb-2">Tài khoản thử nghiệm:</p>
+            <p className="text-xs text-slate-500 font-medium mb-2">Tài khoản thử nghiệm (DEV):</p>
             <div className="grid grid-cols-2 gap-1.5">
               {[
-                { u: 'admin', p: 'Admin@123', label: 'Quản trị', color: 'red' },
-                { u: 'cmo01', p: 'Cmo@123', label: 'CMO', color: 'blue' },
-                { u: 'station01', p: 'Station@123', label: 'Trạm', color: 'green' },
-                { u: 'night01', p: 'Night@123', label: 'Kíp đêm', color: 'purple' },
+                { u: 'admin', label: 'Quản trị' },
+                { u: 'cmo01', label: 'CMO' },
+                { u: 'station01', label: 'Trạm' },
+                { u: 'night01', label: 'Kíp đêm' },
               ].map(a => (
                 <button
                   key={a.u}
                   type="button"
-                  onClick={() => setForm({ username: a.u, password: a.p })}
+                  onClick={() => setForm(f => ({ ...f, username: a.u, password: '' }))}
                   className="text-left px-2.5 py-1.5 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-xs text-slate-400 hover:text-slate-200 transition-colors border border-slate-600/50"
                 >
                   <span className="block font-medium text-slate-300">{a.label}</span>
@@ -113,6 +114,7 @@ export default function Login() {
               ))}
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
