@@ -32,8 +32,9 @@ export default function GISMap() {
 
   const filteredCameras = filter === 'all' ? gisData.cameras : gisData.cameras.filter(c => c.camera_type === filter);
 
-  const centerLat = 20.65;
-  const centerLng = 106.4;
+  // Center of Cao tốc Hà Nội – Hải Phòng (~KM52, midpoint of 105.5km route)
+  const centerLat = 20.918;
+  const centerLng = 106.353;
 
   return (
     <div className="card h-full flex flex-col">
@@ -65,7 +66,7 @@ export default function GISMap() {
       <div className="flex-1 rounded-lg overflow-hidden" style={{ minHeight: '350px' }}>
         <MapContainer
           center={[centerLat, centerLng]}
-          zoom={10}
+          zoom={9}
           style={{ height: '100%', width: '100%' }}
           zoomControl={true}
         >

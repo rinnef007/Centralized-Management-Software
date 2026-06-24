@@ -22,19 +22,20 @@ async function seed() {
       ON CONFLICT (username) DO NOTHING
     `, [adminHash, cmoHash, stationHash, nightHash]);
 
-    // Stations
+    // Stations — Cao tốc Hà Nội – Hải Phòng (CT.03), ~105.5 km
+    // Route: Cổ Bi, Gia Lâm (~21.003°N, 105.947°E) → Đình Vũ, Hải An (~20.832°N, 106.783°E)
     await client.query(`
       INSERT INTO stations (code, name, km_marker, lat, lng, lane_count, type) VALUES
-      ('CMO', 'Trung tâm điều hành CMO', 0, 20.8449, 106.6881, 0, 'control_center'),
-      ('S01', 'Trạm thu phí đầu tuyến', 0.5, 20.8501, 106.6945, 12, 'toll'),
-      ('S02', 'Trạm thu phí QL39', 15.2, 20.7823, 106.5412, 10, 'toll'),
-      ('S03', 'Trạm thu phí QL38B', 28.7, 20.6934, 106.4123, 10, 'toll'),
-      ('S04', 'Trạm thu phí QL10', 42.1, 20.5876, 106.2987, 10, 'toll'),
-      ('S05', 'Trạm thu phí cuối tuyến', 58.3, 20.4521, 106.1234, 12, 'toll'),
-      ('S06', 'Trạm thu phí TL353', 35.6, 20.6123, 106.3456, 8, 'toll'),
-      ('W01', 'Trạm cân tải trọng KM15', 15.0, 20.7800, 106.5380, 3, 'weighing'),
-      ('W02', 'Trạm cân tải trọng KM42', 42.0, 20.5850, 106.2960, 4, 'weighing'),
-      ('W03', 'Trạm cân tải trọng KM58', 58.0, 20.4500, 106.1200, 6, 'weighing')
+      ('CMO', 'Trung tâm điều hành CMO', 52.0, 20.918, 106.353, 0, 'control_center'),
+      ('S01', 'Trạm thu phí Cổ Bi (đầu tuyến)', 2.0, 20.999, 105.963, 12, 'toll'),
+      ('S02', 'Trạm thu phí QL39', 28.0, 20.957, 106.170, 10, 'toll'),
+      ('S03', 'Trạm thu phí QL38B', 42.0, 20.934, 106.281, 10, 'toll'),
+      ('S04', 'Trạm thu phí QL10', 67.0, 20.892, 106.480, 10, 'toll'),
+      ('S05', 'Trạm thu phí Đình Vũ (cuối tuyến)', 103.0, 20.835, 106.748, 12, 'toll'),
+      ('S06', 'Trạm thu phí TL353', 55.0, 20.912, 106.385, 8, 'toll'),
+      ('W01', 'Trạm cân tải trọng KM28', 28.0, 20.957, 106.170, 3, 'weighing'),
+      ('W02', 'Trạm cân tải trọng KM55', 55.0, 20.912, 106.385, 4, 'weighing'),
+      ('W03', 'Trạm cân tải trọng KM85', 85.0, 20.865, 106.629, 6, 'weighing')
       ON CONFLICT (code) DO NOTHING
     `);
 
@@ -53,18 +54,32 @@ async function seed() {
       ON CONFLICT (ip_address) DO NOTHING
     `);
 
-    // CCTV Cameras (58 cameras)
+    // CCTV Cameras (58 cameras) — distributed along the real route
+    // Route start: 21.003°N 105.947°E → end: 20.832°N 106.783°E (~105.5 km)
+    // Δlat ≈ -0.001621/km, Δlng ≈ +0.007929/km
     const cctvInserts = [];
-    const cctvStations = [2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7, 7, 7];
-    const cctvLats = [20.8501, 20.8502, 20.8503, 20.8504, 20.7823, 20.7824, 20.7825, 20.6934, 20.6935, 20.6936, 20.5876, 20.5877, 20.5878, 20.4521, 20.4522, 20.6123, 20.6124, 20.6125];
-    const cctvLngs = [106.6945, 106.6946, 106.6947, 106.6948, 106.5412, 106.5413, 106.5414, 106.4123, 106.4124, 106.4125, 106.2987, 106.2988, 106.2989, 106.1234, 106.1235, 106.3456, 106.3457, 106.3458];
+    // Station anchor points (stationId, baseLat, baseLng)
+    const cctvAnchors = [
+      { stationId: 2, lat: 20.999, lng: 105.963 }, // S01 KM2
+      { stationId: 3, lat: 20.957, lng: 106.170 }, // S02 KM28
+      { stationId: 4, lat: 20.934, lng: 106.281 }, // S03 KM42
+      { stationId: 5, lat: 20.892, lng: 106.480 }, // S04 KM67
+      { stationId: 6, lat: 20.835, lng: 106.748 }, // S05 KM103
+      { stationId: 7, lat: 20.912, lng: 106.385 }, // S06 KM55
+    ];
 
     for (let i = 1; i <= 58; i++) {
-      const stIdx = Math.min(Math.floor((i - 1) / 4), cctvStations.length - 1);
-      const lat = cctvLats[stIdx] + (Math.random() - 0.5) * 0.002;
-      const lng = cctvLngs[stIdx] + (Math.random() - 0.5) * 0.002;
+      // Evenly distribute cameras along the 105.5km route
+      const km = (i - 1) * (105.5 / 57);
+      const lat = 21.003 - km * 0.001621;
+      const lng = 105.947 + km * 0.007929;
+      // Assign to nearest anchor station
+      let nearestAnchor = cctvAnchors[0];
+      let minDist = Math.abs(km - 2);
+      const anchKm = [2, 28, 42, 67, 103, 55];
+      anchKm.forEach((ak, idx) => { const d = Math.abs(km - ak); if (d < minDist) { minDist = d; nearestAnchor = cctvAnchors[idx]; } });
       const status = i % 15 === 0 ? 'offline' : (i % 8 === 0 ? 'warning' : 'online');
-      cctvInserts.push(`('CCTV-${String(i).padStart(3,'0')}', 'Camera CCTV ${i}', 'cctv', '192.168.110.${i}', 110, ${cctvStations[stIdx] || 2}, ${lat.toFixed(7)}, ${lng.toFixed(7)}, '${status}')`);
+      cctvInserts.push(`('CCTV-${String(i).padStart(3,'0')}', 'Camera CCTV KM${km.toFixed(1)}', 'cctv', '192.168.110.${i}', 110, ${nearestAnchor.stationId}, ${lat.toFixed(7)}, ${lng.toFixed(7)}, '${status}')`);
     }
 
     await client.query(`
@@ -73,40 +88,45 @@ async function seed() {
       ON CONFLICT (camera_code) DO NOTHING
     `);
 
-    // VDS Cameras (12 cameras)
+    // VDS Cameras (12 cameras) — spaced every ~8.5km along the route
     for (let i = 1; i <= 12; i++) {
-      const km = (i * 5).toFixed(1);
-      const lat = (20.8449 - i * 0.035).toFixed(7);
-      const lng = (106.6881 - i * 0.05).toFixed(7);
+      const km = i * 8.5;
+      const lat = (21.003 - km * 0.001621).toFixed(7);
+      const lng = (105.947 + km * 0.007929).toFixed(7);
       const status = i === 7 ? 'offline' : 'online';
+      const stationId = km < 15 ? 2 : (km < 35 ? 3 : (km < 52 ? 4 : (km < 70 ? 5 : (km < 90 ? 7 : 6))));
       await client.query(`
         INSERT INTO cameras (camera_code, name, camera_type, ip_address, vlan_id, station_id, lat, lng, status)
-        VALUES ('VDS-${String(i).padStart(3,'0')}', 'Camera VDS KM${km}', 'vds', '192.168.111.${i}', 111, ${Math.min(i % 7 + 2, 7)}, ${lat}, ${lng}, '${status}')
+        VALUES ('VDS-${String(i).padStart(3,'0')}', 'Camera VDS KM${km.toFixed(1)}', 'vds', '192.168.111.${i}', 111, ${stationId}, ${lat}, ${lng}, '${status}')
         ON CONFLICT (camera_code) DO NOTHING
       `);
     }
 
-    // Bridge Cameras (11 cameras)
-    for (let i = 1; i <= 11; i++) {
-      const lat = (20.8449 - i * 0.04).toFixed(7);
-      const lng = (106.6881 - i * 0.06).toFixed(7);
+    // Bridge Cameras (11 cameras) — at major bridge crossings along route
+    // Bridges: Thanh Trì area, over Red River tributaries, etc.
+    const bridgeKms = [5, 12, 20, 30, 38, 46, 57, 66, 75, 88, 98];
+    for (let i = 0; i < 11; i++) {
+      const km = bridgeKms[i];
+      const lat = (21.003 - km * 0.001621).toFixed(7);
+      const lng = (105.947 + km * 0.007929).toFixed(7);
+      const stationId = km < 15 ? 2 : (km < 35 ? 3 : (km < 52 ? 4 : (km < 70 ? 5 : (km < 90 ? 7 : 6))));
       await client.query(`
         INSERT INTO cameras (camera_code, name, camera_type, ip_address, vlan_id, station_id, lat, lng, status)
-        VALUES ('BRIDGE-${String(i).padStart(3,'0')}', 'Camera cầu vượt ${i}', 'bridge', '192.168.116.${i}', 116, ${Math.min(i % 6 + 2, 7)}, ${lat}, ${lng}, 'online')
+        VALUES ('BRIDGE-${String(i + 1).padStart(3,'0')}', 'Camera cầu KM${km}', 'bridge', '192.168.116.${i + 1}', 116, ${stationId}, ${lat}, ${lng}, 'online')
         ON CONFLICT (camera_code) DO NOTHING
       `);
     }
 
-    // VMS Signs (8 signs)
+    // VMS Signs (8 signs) — along Cao tốc Hà Nội – Hải Phòng
     const vmsData = [
-      { code: 'VMS-001', name: 'Biển VMS KM2+500', km: 2.5, lat: 20.8420, lng: 106.6750, msg: 'TỐC ĐỘ TỐI ĐA 80KM/H' },
-      { code: 'VMS-002', name: 'Biển VMS KM8+200', km: 8.2, lat: 20.8120, lng: 106.6320, msg: 'CHÀO MỪNG QUÝ KHÁCH' },
-      { code: 'VMS-003', name: 'Biển VMS KM15+000', km: 15.0, lat: 20.7800, lng: 106.5400, msg: 'TRẠM THU PHÍ QL39 500M' },
-      { code: 'VMS-004', name: 'Biển VMS KM22+500', km: 22.5, lat: 20.7300, lng: 106.4800, msg: 'THỜI TIẾT TỐT - LÁI XE AN TOÀN' },
-      { code: 'VMS-005', name: 'Biển VMS KM29+000', km: 29.0, lat: 20.6900, lng: 106.4100, msg: 'TRẠM THU PHÍ QL38B 1KM' },
-      { code: 'VMS-006', name: 'Biển VMS KM36+500', km: 36.5, lat: 20.6200, lng: 106.3500, msg: 'CẤM DỪNG ĐỖ XE TRÊN ĐƯỜNG CAO TỐC' },
-      { code: 'VMS-007', name: 'Biển VMS KM43+000', km: 43.0, lat: 20.5800, lng: 106.2900, msg: 'TRẠM THU PHÍ QL10 500M' },
-      { code: 'VMS-008', name: 'Biển VMS KM55+000', km: 55.0, lat: 20.4800, lng: 106.1500, msg: 'GẦN ĐẾN TRẠM CUỐI TUYẾN' },
+      { code: 'VMS-001', name: 'Biển VMS KM3+000', km: 3.0, lat: 20.998, lng: 105.971, msg: 'CHÀO MỪNG QUÝ KHÁCH - CAO TỐC HÀ NỘI – HẢI PHÒNG' },
+      { code: 'VMS-002', name: 'Biển VMS KM14+500', km: 14.5, lat: 20.980, lng: 106.062, msg: 'TỐC ĐỘ TỐI ĐA 120KM/H - LÁI XE AN TOÀN' },
+      { code: 'VMS-003', name: 'Biển VMS KM27+000', km: 27.0, lat: 20.959, lng: 106.160, msg: 'TRẠM THU PHÍ QL39 1KM PHÍA TRƯỚC' },
+      { code: 'VMS-004', name: 'Biển VMS KM36+500', km: 36.5, lat: 20.945, lng: 106.233, msg: 'THỜI TIẾT TỐT - ĐIỀU KIỆN LÁI XE BÌNH THƯỜNG' },
+      { code: 'VMS-005', name: 'Biển VMS KM41+000', km: 41.0, lat: 20.937, lng: 106.268, msg: 'TRẠM THU PHÍ QL38B 1KM PHÍA TRƯỚC' },
+      { code: 'VMS-006', name: 'Biển VMS KM54+000', km: 54.0, lat: 20.914, lng: 106.376, msg: 'TRẠM THU PHÍ TL353 1KM PHÍA TRƯỚC' },
+      { code: 'VMS-007', name: 'Biển VMS KM66+000', km: 66.0, lat: 20.893, lng: 106.472, msg: 'TRẠM THU PHÍ QL10 1KM PHÍA TRƯỚC' },
+      { code: 'VMS-008', name: 'Biển VMS KM100+000', km: 100.0, lat: 20.840, lng: 106.724, msg: 'GẦN ĐẾN TRẠM CUỐI TUYẾN ĐÌNH VŨ - HẢI PHÒNG' },
     ];
 
     for (const v of vmsData) {
